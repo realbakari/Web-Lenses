@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Takedown Rush</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --night: #0a0912; /* matches the PlayCanvas clear colour */
+        --fg: #fbf8f2;
+        --fg-dim: rgba(251, 248, 242, 0.62);
+        --fg-faint: rgba(251, 248, 242, 0.14);
+        --hot: #ffc61a;
+        --red: #ff3355;
+        --blue: #4f8cff;
+        --panel: rgba(10, 9, 18, 0.78);
+        --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+        --body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--night);
+        color: var(--fg);
+        font-family: var(--body);
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 440px;
+        max-height: 920px;
+        overflow: hidden;
+        background: var(--night);
+      }
+
+      @media (min-width: 520px) and (min-height: 600px) {
+        #game-container {
+          height: 94vh;
+          border-radius: 28px;
+          outline: 1px solid var(--fg-faint);
+        }
+      }
+
+      canvas#app {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .display {
+        font-family: var(--display);
+        font-style: italic;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+      }
+
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+
+      .label {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--fg-dim);
+      }
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+        transition: opacity 0.3s;
+      }
+
+      .hud-top {
+        position: absolute;
+        top: calc(var(--safe-top) + 12px);
+        left: 14px;
+        right: 14px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: start;
+      }
+
+      .driver {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .portrait {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #1b1d2a center / cover no-repeat;
+        box-shadow: 0 0 0 2px var(--hot);
+        flex: none;
+      }
+
+      .lives {
+        display: flex;
+        gap: 4px;
+        margin-top: 4px;
+      }
+
+      .lives i {
+        width: 18px;
+        height: 8px;
+        border-radius: 3px 3px 1px 1px;
+        background: var(--blue);
+      }
+
+      .lives i.off {
+        background: var(--fg-faint);
+      }
+
+      .takedowns {
+        text-align: center;
+      }
+
+      #takedowns {
+        font-size: 50px;
+        line-height: 0.9;
+        text-shadow: 0 3px 14px rgba(0, 0, 0, 0.6);
+      }
+
+      #score {
+        text-align: right;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .hud-bottom {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        bottom: calc(var(--safe-bottom) + 16px);
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+      }
+
+      .speedo {
+        width: 92px;
+      }
+
+      #speed {
+        font-size: 46px;
+        line-height: 0.9;
+      }
+
+      .boost-wrap {
+        flex: 1;
+        padding-bottom: 6px;
+      }
+
+      .boost-bar {
+        height: 12px;
+        margin-top: 5px;
+        border-radius: 3px;
+        background: var(--fg-faint);
+        overflow: hidden;
+        transform: skewX(-14deg);
+      }
+
+      #boost-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #ff8a1a, var(--hot));
+        box-shadow: 0 0 12px rgba(255, 198, 26, 0.7);
+      }
+
+      #btn-boost {
+        pointer-events: auto;
+        width: 86px;
+        height: 86px;
+        border-radius: 50%;
+        background: rgba(255, 198, 26, 0.18);
+        box-shadow: inset 0 0 0 3px var(--hot);
+        font-family: var(--display);
+        font-style: italic;
+        font-weight: 800;
+        font-size: 20px;
+        letter-spacing: 0.04em;
+        color: var(--hot);
+        transition: transform 0.08s, background 0.15s;
+      }
+
+      #btn-boost.ready {
+        background: var(--hot);
+        color: #1a1203;
+        box-shadow: 0 0 22px rgba(255, 198, 26, 0.6);
+      }
+
+      #btn-boost.active {
+        transform: scale(0.94);
+      }
+
+      #callouts {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 24%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        pointer-events: none;
+        z-index: 12;
+      }
+
+      .callout {
+        font-family: var(--display);
+        font-style: italic;
+        font-weight: 800;
+        text-transform: uppercase;
+        font-size: 22px;
+        letter-spacing: 0.02em;
+        color: var(--fg);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+        animation: pop 1s ease-out forwards;
+      }
+
+      .callout.big {
+        font-size: 58px;
+        line-height: 0.9;
+        color: var(--hot);
+        -webkit-text-stroke: 2px #2a1600;
+        paint-order: stroke fill;
+        text-shadow: 0 4px 0 #2a1600, 0 0 28px rgba(255, 198, 26, 0.5);
+        animation: slam 1.6s cubic-bezier(0.2, 1.5, 0.4, 1) forwards;
+      }
+
+      .callout.red {
+        color: var(--red);
+      }
+
+      @keyframes pop {
+        0% {
+          opacity: 0;
+          transform: scale(0.7);
+        }
+        15% {
+          opacity: 1;
+          transform: scale(1.06);
+        }
+        75% {
+          opacity: 1;
+          transform: none;
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-12px);
+        }
+      }
+
+      @keyframes slam {
+        0% {
+          opacity: 0;
+          transform: scale(2.2) rotate(-6deg);
+        }
+        12% {
+          opacity: 1;
+          transform: scale(0.95) rotate(-4deg);
+        }
+        20% {
+          transform: scale(1) rotate(-4deg);
+        }
+        80% {
+          opacity: 1;
+          transform: rotate(-4deg);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-10px) rotate(-4deg);
+        }
+      }
+
+      #flash {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 9;
+        background: #fff;
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+
+      #flash.show {
+        opacity: 0.55;
+        transition: none;
+      }
+
+      /* ---------- Screens ---------- */
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 22px);
+        z-index: 30;
+        transition: opacity 0.35s, visibility 0.35s;
+      }
+
+      .screen.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .is-menu #hud,
+      .is-over #hud {
+        opacity: 0;
+      }
+
+      #menu {
+        justify-content: space-between;
+        background: linear-gradient(180deg, rgba(10, 9, 18, 0.65) 0%, transparent 28%, transparent 55%, rgba(10, 9, 18, 0.92) 80%);
+      }
+
+      .title {
+        font-size: clamp(58px, 18vw, 78px);
+        line-height: 0.82;
+      }
+
+      .title span {
+        color: var(--hot);
+      }
+
+      .tagline {
+        margin-top: 12px;
+        max-width: 30ch;
+        font-size: 15px;
+        line-height: 1.4;
+        color: var(--fg-dim);
+      }
+
+      .tagline b {
+        color: var(--fg);
+      }
+
+      .driver-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: var(--panel);
+        box-shadow: inset 0 0 0 1px var(--fg-faint);
+      }
+
+      .driver-card .portrait {
+        width: 46px;
+        height: 46px;
+      }
+
+      #driver-line {
+        font-size: 15px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+
+      .actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .btn {
+        height: 60px;
+        border-radius: 14px;
+        font-family: var(--display);
+        font-style: italic;
+        font-weight: 800;
+        font-size: 24px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        transition: transform 0.1s;
+      }
+
+      .btn:active {
+        transform: scale(0.97);
+      }
+
+      .btn-hot {
+        background: var(--hot);
+        color: #1a1203;
+      }
+
+      .btn-ghost {
+        height: 50px;
+        background: var(--fg-faint);
+        font-size: 19px;
+      }
+
+      .btn[hidden] {
+        display: none;
+      }
+
+      .menu-foot {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--fg-dim);
+      }
+
+      #over {
+        justify-content: flex-end;
+        background: linear-gradient(180deg, transparent 0%, rgba(10, 9, 18, 0.45) 30%, rgba(10, 9, 18, 0.94) 62%);
+      }
+
+      .report {
+        padding: 18px;
+        border-radius: 20px;
+        background: var(--panel);
+        box-shadow: inset 0 0 0 1px var(--fg-faint);
+      }
+
+      .report-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .totaled {
+        font-size: 44px;
+        line-height: 0.85;
+        color: var(--red);
+      }
+
+      .report-main {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 14px;
+      }
+
+      #r-takedowns {
+        font-size: 64px;
+        line-height: 0.85;
+        color: var(--hot);
+      }
+
+      .new-best {
+        display: none;
+        padding: 4px 9px;
+        border-radius: 99px;
+        background: var(--hot);
+        color: #1a1203;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .new-best.show {
+        display: inline-block;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--fg-faint);
+      }
+
+      .stat-val {
+        font-family: var(--display);
+        font-style: italic;
+        font-weight: 800;
+        font-size: 24px;
+      }
+
+      .over-actions {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      #toast {
+        position: absolute;
+        top: calc(var(--safe-top) + 18px);
+        left: 50%;
+        padding: 10px 16px;
+        border-radius: 99px;
+        background: var(--fg);
+        color: var(--night);
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        transform: translate(-50%, -10px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+        z-index: 50;
+      }
+
+      #toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .callout,
+        .callout.big {
+          animation-duration: 0.9s;
+          animation-timing-function: linear;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container" class="is-menu">
+      <canvas id="app"></canvas>
+      <div id="flash"></div>
+
+      <div id="hud">
+        <div class="hud-top">
+          <div class="driver">
+            <div class="portrait" data-avatar></div>
+            <div>
+              <div class="label">Cars</div>
+              <div id="lives" class="lives"><i></i><i></i><i></i></div>
+            </div>
+          </div>
+          <div class="takedowns">
+            <div id="takedowns" class="display num">0</div>
+            <div class="label">Takedowns</div>
+          </div>
+          <div>
+            <div id="score" class="display num">0</div>
+            <div class="label" style="text-align: right">Score</div>
+          </div>
+        </div>
+        <div class="hud-bottom">
+          <div class="speedo">
+            <div id="speed" class="display num">0</div>
+            <div class="label">km/h</div>
+          </div>
+          <div class="boost-wrap">
+            <div class="label">Boost</div>
+            <div class="boost-bar"><div id="boost-fill"></div></div>
+          </div>
+          <button id="btn-boost">BOOST</button>
+        </div>
+      </div>
+
+      <div id="callouts"></div>
+
+      <section id="menu" class="screen">
+        <div>
+          <h1 class="title display">Take<span>down</span><br />Rush</h1>
+          <p class="tagline">Slam rivals into traffic. <b>Drive against oncoming cars</b> to fill your boost. Don't get wrecked.</p>
+        </div>
+        <div>
+          <div class="driver-card">
+            <div class="portrait" data-avatar></div>
+            <div>
+              <div class="label">Driver</div>
+              <div id="driver-line">You're behind the wheel</div>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="btn-start" class="btn btn-hot">Race</button>
+            <button id="btn-board" class="btn btn-ghost" hidden>Leaderboard</button>
+          </div>
+          <div class="menu-foot">
+            <span>Drag to steer · Hold boost</span>
+            <span id="menu-best" class="num"></span>
+          </div>
+        </div>
+      </section>
+
+      <section id="over" class="screen hidden">
+        <div class="report">
+          <div class="report-head">
+            <div class="portrait" data-avatar></div>
+            <div class="totaled display">Totaled</div>
+          </div>
+          <div class="report-main">
+            <div>
+              <div class="label">Takedowns</div>
+              <div id="r-takedowns" class="display num">0</div>
+            </div>
+            <span id="new-best" class="new-best">New best</span>
+          </div>
+          <div class="stats">
+            <div><div id="r-score" class="stat-val num">0</div><div class="label">Score</div></div>
+            <div><div id="r-top" class="stat-val num">0</div><div class="label">Top km/h</div></div>
+            <div><div id="r-near" class="stat-val num">0</div><div class="label">Near miss</div></div>
+            <div><div id="r-km" class="stat-val num">0</div><div class="label">km</div></div>
+          </div>
+        </div>
+        <div class="over-actions">
+          <button id="btn-again" class="btn btn-hot">Race again</button>
+          <button id="btn-share" class="btn btn-ghost" style="height: 60px">Challenge</button>
+        </div>
+        <button id="btn-board-2" class="btn btn-ghost" style="margin-top: 10px" hidden>Leaderboard</button>
+      </section>
+
+      <div id="toast"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

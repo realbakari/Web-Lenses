@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Perfect Shot</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --ink: #141210; /* matches the PlayCanvas clear colour */
+        --paper: #f7f1e6;
+        --paper-2: #efe6d4;
+        --fg: #ffffff;
+        --fg-dim: rgba(255, 255, 255, 0.72);
+        --ink-dim: rgba(20, 18, 16, 0.6);
+        --red: #ff4b3e;
+        --gold: #ffc53d;
+        --body: 'DM Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --hand: 'Caveat', 'Bradley Hand', cursive;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink);
+        color: var(--fg);
+        font-family: var(--body);
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 440px;
+        max-height: 920px;
+        overflow: hidden;
+        background: var(--ink);
+      }
+
+      @media (min-width: 520px) and (min-height: 600px) {
+        #game-container {
+          height: 94vh;
+          border-radius: 28px;
+        }
+      }
+
+      canvas#app {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- Viewfinder ---------- */
+      #viewfinder {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+        transition: opacity 0.25s;
+      }
+
+      .vf-top {
+        position: absolute;
+        top: calc(var(--safe-top) + 14px);
+        left: 16px;
+        right: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+      }
+
+      .rec {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .rec::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: blink 1s steps(2) infinite;
+      }
+
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+
+      #prompt {
+        position: absolute;
+        top: calc(var(--safe-top) + 46px);
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: calc(100% - 40px);
+        padding: 8px 14px;
+        border-radius: 99px;
+        background: rgba(20, 18, 16, 0.55);
+        font-size: 14px;
+        font-weight: 600;
+        text-align: center;
+        transition: opacity 0.3s;
+      }
+
+      /* The 4:5 photo frame: what gets captured */
+      #frame {
+        position: absolute;
+        left: 50%;
+        top: 46%;
+        width: 84%;
+        aspect-ratio: 4 / 5;
+        transform: translate(-50%, -50%);
+      }
+
+      #frame i {
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border: 0 solid rgba(255, 255, 255, 0.9);
+      }
+
+      #frame i:nth-child(1) {
+        top: 0;
+        left: 0;
+        border-top-width: 3px;
+        border-left-width: 3px;
+      }
+      #frame i:nth-child(2) {
+        top: 0;
+        right: 0;
+        border-top-width: 3px;
+        border-right-width: 3px;
+      }
+      #frame i:nth-child(3) {
+        bottom: 0;
+        left: 0;
+        border-bottom-width: 3px;
+        border-left-width: 3px;
+      }
+      #frame i:nth-child(4) {
+        bottom: 0;
+        right: 0;
+        border-bottom-width: 3px;
+        border-right-width: 3px;
+      }
+
+      #reticle {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 54px;
+        height: 54px;
+        transform: translate(-50%, -50%);
+        border: 1.5px solid rgba(255, 255, 255, 0.75);
+        border-radius: 50%;
+        transition: border-color 0.12s, transform 0.12s;
+      }
+
+      #reticle.locked {
+        border-color: var(--gold);
+        transform: translate(-50%, -50%) scale(0.85);
+      }
+
+      .vf-bottom {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(var(--safe-bottom) + 22px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #shutter {
+        pointer-events: auto;
+        position: relative;
+        width: 84px;
+        height: 84px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 5px #fff;
+        transition: transform 0.08s;
+      }
+
+      #shutter::after {
+        content: '';
+        position: absolute;
+        inset: 11px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.85);
+        transition: transform 0.1s, background 0.1s;
+      }
+
+      #shutter:active::after {
+        transform: scale(0.88);
+        background: #fff;
+      }
+
+      #timer {
+        position: absolute;
+        inset: -6px;
+        transform: rotate(-90deg);
+      }
+
+      #timer circle {
+        fill: none;
+        stroke: var(--gold);
+        stroke-width: 4;
+        stroke-linecap: round;
+      }
+
+      #roll {
+        position: absolute;
+        left: 18px;
+        bottom: calc(var(--safe-bottom) + 32px);
+        display: flex;
+        gap: 4px;
+      }
+
+      #roll i {
+        width: 9px;
+        height: 14px;
+        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      #roll i.used {
+        background: var(--gold);
+      }
+
+      #flash {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 15;
+        transition: opacity 0.35s;
+      }
+
+      #flash.show {
+        opacity: 0.9;
+        transition: none;
+      }
+
+      /* ---------- Review: the polaroid ---------- */
+      #review {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: rgba(20, 18, 16, 0.55);
+        z-index: 20;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+      }
+
+      #review.show {
+        opacity: 1;
+      }
+
+      .polaroid {
+        background: var(--paper);
+        color: var(--ink);
+        padding: 10px 10px 0;
+        border-radius: 3px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
+
+      .polaroid img,
+      .polaroid .blank {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 5;
+        object-fit: cover;
+        background: #2a2622;
+      }
+
+      .polaroid .cap {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 6px 4px 8px;
+        font-family: var(--hand);
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      #review .polaroid {
+        width: 62%;
+        transform: rotate(-3deg) scale(0.6);
+        transition: transform 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+      }
+
+      #review.show .polaroid {
+        transform: rotate(-3deg) scale(1);
+      }
+
+      #rating {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-align: center;
+      }
+
+      #rating.perfect {
+        color: var(--gold);
+        text-shadow: 0 0 22px rgba(255, 197, 61, 0.55);
+      }
+
+      #breakdown {
+        display: flex;
+        gap: 14px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg-dim);
+      }
+
+      #breakdown b {
+        color: var(--fg);
+      }
+
+      #breakdown .bonus {
+        color: var(--gold);
+      }
+
+      /* ---------- Screens ---------- */
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 20px);
+        z-index: 30;
+        transition: opacity 0.3s, visibility 0.3s;
+      }
+
+      .screen.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .is-menu #viewfinder,
+      .is-over #viewfinder {
+        opacity: 0;
+      }
+
+      #menu {
+        justify-content: space-between;
+        background: linear-gradient(180deg, rgba(20, 18, 16, 0.6) 0%, transparent 30%, transparent 50%, rgba(20, 18, 16, 0.92) 76%);
+      }
+
+      .title {
+        font-size: clamp(52px, 16vw, 68px);
+        font-weight: 800;
+        letter-spacing: -0.05em;
+        line-height: 0.9;
+      }
+
+      .title em {
+        font-family: var(--hand);
+        font-style: normal;
+        font-weight: 700;
+        font-size: 1.12em;
+        color: var(--gold);
+        letter-spacing: 0;
+      }
+
+      .tagline {
+        margin-top: 12px;
+        max-width: 28ch;
+        font-size: 16px;
+        line-height: 1.4;
+        color: var(--fg-dim);
+      }
+
+      .menu-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg-dim);
+      }
+
+      .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: #3a332c center / cover no-repeat;
+        box-shadow: 0 0 0 2px var(--paper);
+        flex: none;
+        display: none;
+      }
+
+      .has-avatar .avatar {
+        display: block;
+      }
+
+      #streak b {
+        color: var(--gold);
+      }
+
+      .mode {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        min-height: 72px;
+        padding: 12px 18px;
+        border-radius: 18px;
+        text-align: left;
+        transition: transform 0.1s;
+      }
+
+      .mode:active {
+        transform: scale(0.97);
+      }
+
+      .mode.primary {
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      .mode.secondary {
+        margin-top: 10px;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .mode-name {
+        display: block;
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+      }
+
+      .mode-sub {
+        display: block;
+        margin-top: 2px;
+        font-size: 13px;
+        opacity: 0.7;
+      }
+
+      .mode-side {
+        font-family: var(--hand);
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      /* Results: the developed roll */
+      #over {
+        background: var(--paper-2);
+        color: var(--ink);
+        overflow-y: auto;
+        touch-action: pan-y;
+      }
+
+      .over-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .over-head .avatar {
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+
+      #over-title {
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      #over-sub {
+        font-size: 13px;
+        color: var(--ink-dim);
+      }
+
+      .over-score {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin: 14px 0 12px;
+      }
+
+      #over-total {
+        font-size: 54px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        line-height: 1;
+      }
+
+      .new-best {
+        display: none;
+        padding: 3px 8px;
+        border-radius: 99px;
+        background: var(--ink);
+        color: var(--gold);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .new-best.show {
+        display: inline-block;
+      }
+
+      #scrapbook {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px 10px;
+        padding: 4px 2px 8px;
+      }
+
+      #scrapbook .polaroid {
+        padding: 5px 5px 0;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+      }
+
+      #scrapbook .polaroid .cap {
+        font-size: 15px;
+        padding: 4px 2px 5px;
+      }
+
+      #scrapbook .polaroid:nth-child(3n + 1) {
+        transform: rotate(-2.5deg);
+      }
+      #scrapbook .polaroid:nth-child(3n + 2) {
+        transform: rotate(1.5deg) translateY(4px);
+      }
+      #scrapbook .polaroid:nth-child(3n) {
+        transform: rotate(-1deg);
+      }
+
+      .over-actions {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 10px;
+        margin-top: auto;
+        padding-top: 14px;
+      }
+
+      .btn {
+        height: 54px;
+        border-radius: 16px;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        transition: transform 0.1s;
+      }
+
+      .btn:active {
+        transform: scale(0.97);
+      }
+
+      .btn-ink {
+        background: var(--ink);
+        color: var(--paper);
+      }
+
+      .btn-line {
+        box-shadow: inset 0 0 0 2px var(--ink);
+        color: var(--ink);
+      }
+
+      .btn-text {
+        height: 40px;
+        font-size: 14px;
+        color: var(--ink-dim);
+      }
+
+      .btn[hidden] {
+        display: none;
+      }
+
+      #toast {
+        position: absolute;
+        top: calc(var(--safe-top) + 18px);
+        left: 50%;
+        padding: 10px 16px;
+        border-radius: 99px;
+        background: var(--ink);
+        color: var(--paper);
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        transform: translate(-50%, -10px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+        z-index: 50;
+      }
+
+      #toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container" class="is-menu">
+      <canvas id="app"></canvas>
+
+      <div id="viewfinder">
+        <div class="vf-top">
+          <span class="rec" id="vf-mode">DAILY #1</span>
+          <span id="vf-count" class="num">SHOT 1/6</span>
+          <span id="vf-score" class="num">0</span>
+        </div>
+        <div id="prompt">Catch the skater at the top of the air</div>
+        <div id="frame"><i></i><i></i><i></i><i></i><div id="reticle"></div></div>
+        <div id="roll"></div>
+        <div class="vf-bottom">
+          <button id="shutter" aria-label="Take photo">
+            <svg id="timer" viewBox="0 0 96 96"><circle id="timer-ring" cx="48" cy="48" r="45" /></svg>
+          </button>
+        </div>
+      </div>
+      <div id="flash"></div>
+
+      <div id="review">
+        <div class="polaroid">
+          <img id="review-img" alt="" />
+          <div class="cap"><span id="review-cap">Big air</span><span id="review-score" class="num">92</span></div>
+        </div>
+        <div id="rating">Perfect shot!</div>
+        <div id="breakdown"></div>
+      </div>
+
+      <section id="menu" class="screen">
+        <div>
+          <h1 class="title">Perfect <em>Shot</em></h1>
+          <p class="tagline">Six fleeting moments. One shot each. Catch them at their peak.</p>
+        </div>
+        <div>
+          <div class="menu-meta">
+            <span class="avatar" data-avatar></span>
+            <span id="streak">Your camera is ready</span>
+          </div>
+          <button id="btn-daily" class="mode primary">
+            <span><span id="daily-name" class="mode-name">Daily Shoot #1</span><span class="mode-sub">Same moments for everyone today</span></span>
+            <span id="daily-side" class="mode-side"></span>
+          </button>
+          <button id="btn-free" class="mode secondary">
+            <span><span class="mode-name">Free Shoot</span><span class="mode-sub">New moments every roll</span></span>
+            <span id="free-side" class="mode-side"></span>
+          </button>
+        </div>
+      </section>
+
+      <section id="over" class="screen hidden">
+        <div class="over-head">
+          <span class="avatar" data-avatar></span>
+          <div>
+            <div id="over-title">Daily Shoot #1</div>
+            <div id="over-sub">Your roll is developed</div>
+          </div>
+        </div>
+        <div class="over-score">
+          <div id="over-total" class="num">0</div>
+          <span id="new-best" class="new-best">Best today</span>
+        </div>
+        <div id="scrapbook"></div>
+        <div class="over-actions">
+          <button id="btn-share" class="btn btn-ink">Challenge</button>
+          <button id="btn-again" class="btn btn-line">Shoot again</button>
+          <button id="btn-board" class="btn btn-line" hidden>Leaderboard</button>
+          <button id="btn-menu" class="btn btn-text">Menu</button>
+        </div>
+      </section>
+
+      <div id="toast"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

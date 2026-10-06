@@ -1,0 +1,11 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+
+# Generated submission assets (zip, icon, videos): rebuild with npm run pack / record-preview / render-icon
+submission/
+
+# OS and editor
+.DS_Store
+*.log

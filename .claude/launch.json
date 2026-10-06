@@ -1,0 +1,181 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "only-1-percent",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/only-1-percent",
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "stack-tower",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/stack-tower",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3001",
+        "--strictPort"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "stack-tower-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/stack-tower",
+        "vite",
+        "preview",
+        "lenses/stack-tower",
+        "--port",
+        "4174",
+        "--strictPort"
+      ],
+      "port": 4174
+    },
+    {
+      "name": "gridlock",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/gridlock",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3002",
+        "--strictPort"
+      ],
+      "port": 3002
+    },
+    {
+      "name": "gridlock-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/gridlock",
+        "vite",
+        "preview",
+        "lenses/gridlock",
+        "--port",
+        "4175",
+        "--strictPort"
+      ],
+      "port": 4175
+    },
+    {
+      "name": "starlane",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/starlane",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3003",
+        "--strictPort"
+      ],
+      "port": 3003
+    },
+    {
+      "name": "starlane-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/starlane",
+        "vite",
+        "preview",
+        "lenses/starlane",
+        "--port",
+        "4176",
+        "--strictPort"
+      ],
+      "port": 4176
+    },
+    {
+      "name": "takedown",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/takedown",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3004",
+        "--strictPort"
+      ],
+      "port": 3004
+    },
+    {
+      "name": "takedown-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/takedown",
+        "vite",
+        "preview",
+        "lenses/takedown",
+        "--port",
+        "4177",
+        "--strictPort"
+      ],
+      "port": 4177
+    },
+    {
+      "name": "perfect-shot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/perfect-shot",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3005",
+        "--strictPort"
+      ],
+      "port": 3005
+    },
+    {
+      "name": "perfect-shot-dist",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/perfect-shot",
+        "vite",
+        "preview",
+        "lenses/perfect-shot",
+        "--port",
+        "4178",
+        "--strictPort"
+      ],
+      "port": 4178
+    },
+    {
+      "name": "bitmoji-island",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "lenses/bitmoji-island",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "3006",
+        "--strictPort"
+      ],
+      "port": 3006
+    }
+  ]
+}

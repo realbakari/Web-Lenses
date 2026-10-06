@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>How High Can You Stack?</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        /* Updated every frame from the tower's hue */
+        --bg-top: hsl(200 45% 30%);
+        --bg-bot: hsl(230 55% 13%);
+        --accent: hsl(200 70% 45%);
+        --fg: #ffffff;
+        --fg-dim: rgba(255, 255, 255, 0.66);
+        --fg-faint: rgba(255, 255, 255, 0.16);
+        --sheet: rgba(10, 12, 24, 0.78);
+        --display: 'Bricolage Grotesque Variable', 'Avenir Next', 'Helvetica Neue', sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0c0e1c;
+        color: var(--fg);
+        font-family: var(--display);
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 440px;
+        max-height: 920px;
+        overflow: hidden;
+        background: linear-gradient(180deg, var(--bg-top), var(--bg-bot));
+      }
+
+      @media (min-width: 520px) and (min-height: 600px) {
+        #game-container {
+          height: 94vh;
+          border-radius: 28px;
+        }
+      }
+
+      canvas#app {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: absolute;
+        top: calc(var(--safe-top) + 34px);
+        left: 0;
+        right: 0;
+        text-align: center;
+        pointer-events: none;
+        z-index: 10;
+        transition: opacity 0.3s, transform 0.3s;
+      }
+
+      #score {
+        display: inline-block;
+        font-size: 92px;
+        font-weight: 800;
+        line-height: 1;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 3px 0 rgba(0, 0, 0, 0.12);
+      }
+
+      #score.bump {
+        animation: bump 0.22s ease-out;
+      }
+
+      @keyframes bump {
+        40% {
+          transform: scale(1.12);
+        }
+      }
+
+      #combo {
+        height: 30px;
+        margin-top: 8px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.15s, transform 0.15s;
+      }
+
+      #combo.show {
+        opacity: 1;
+        transform: none;
+      }
+
+      #combo b {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 3px 9px 4px;
+        border-radius: 99px;
+        background: var(--fg);
+        color: var(--accent);
+        letter-spacing: 0.02em;
+      }
+
+      .is-menu #hud,
+      .is-over #hud {
+        opacity: 0;
+      }
+
+      /* ---------- Menu ---------- */
+      #menu {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: calc(var(--safe-top) + 30px) 26px calc(var(--safe-bottom) + 34px);
+        pointer-events: none;
+        z-index: 20;
+        transition: opacity 0.25s;
+      }
+
+      :not(.is-menu) > #menu {
+        opacity: 0;
+      }
+
+      .menu-best {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        letter-spacing: 0.02em;
+        min-height: 18px;
+      }
+
+      .menu-title {
+        margin-top: 14px;
+        font-size: clamp(52px, 15vw, 66px);
+        font-weight: 800;
+        line-height: 0.92;
+        letter-spacing: -0.045em;
+      }
+
+      .menu-how {
+        margin-top: 16px;
+        max-width: 26ch;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.35;
+        color: var(--fg-dim);
+      }
+
+      .menu-how b {
+        color: var(--fg);
+        font-weight: 700;
+      }
+
+      .menu-cta {
+        align-self: center;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        animation: breathe 1.6s ease-in-out infinite;
+      }
+
+      @keyframes breathe {
+        50% {
+          opacity: 0.45;
+        }
+      }
+
+      /* ---------- Results ---------- */
+      #over {
+        position: absolute;
+        left: 12px;
+        right: 12px;
+        bottom: calc(var(--safe-bottom) + 12px);
+        padding: 22px 20px 20px;
+        border-radius: 26px;
+        background: var(--sheet);
+        z-index: 30;
+        transform: translateY(calc(100% + 40px));
+        transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1);
+      }
+
+      .is-over #over {
+        transform: none;
+        transition-delay: 0.9s; /* let the camera pull back first */
+      }
+
+      .over-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      .over-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        letter-spacing: 0.02em;
+      }
+
+      .over-score {
+        font-size: 76px;
+        font-weight: 800;
+        line-height: 0.95;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .over-stats {
+        text-align: right;
+        padding-bottom: 6px;
+      }
+
+      .over-stat {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        line-height: 1.6;
+      }
+
+      .over-stat b {
+        color: var(--fg);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .new-best {
+        display: none;
+        margin-right: 6px;
+        padding: 2px 8px 3px;
+        border-radius: 99px;
+        background: var(--fg);
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        vertical-align: 2px;
+      }
+
+      .new-best.show {
+        display: inline-block;
+      }
+
+      .over-line {
+        margin-top: 14px;
+        font-size: 15px;
+        font-weight: 500;
+        line-height: 1.35;
+        color: var(--fg-dim);
+      }
+
+      .over-actions {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .btn {
+        height: 56px;
+        border: 0;
+        border-radius: 18px;
+        font-family: var(--display);
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: transform 0.1s;
+      }
+
+      .btn:active {
+        transform: scale(0.96);
+      }
+
+      .btn-primary {
+        background: var(--fg);
+        color: var(--accent);
+      }
+
+      .btn-ghost {
+        background: var(--fg-faint);
+        color: var(--fg);
+      }
+
+      /* Bitmoji: round, ringed in white. Hidden until it loads. */
+      .avatar {
+        display: none;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.12) center / cover no-repeat;
+        box-shadow: 0 0 0 2px var(--fg);
+        flex: none;
+      }
+
+      .has-avatar .avatar {
+        display: block;
+      }
+
+      .over-who {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+      }
+
+      .menu-who {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .menu-who .avatar {
+        width: 34px;
+        height: 34px;
+      }
+
+      #btn-board {
+        grid-column: 1 / -1;
+        height: 46px;
+        font-size: 15px;
+      }
+
+      #btn-board[hidden] {
+        display: none;
+      }
+
+      #toast {
+        position: absolute;
+        top: calc(var(--safe-top) + 24px);
+        left: 50%;
+        padding: 10px 16px;
+        border-radius: 99px;
+        background: var(--fg);
+        color: #111;
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        transform: translate(-50%, -12px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+        z-index: 40;
+      }
+
+      #toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .menu-cta,
+        #score.bump {
+          animation: none;
+        }
+        #over,
+        .is-over #over {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container" class="is-menu">
+      <canvas id="app"></canvas>
+
+      <div id="hud">
+        <div id="score">0</div>
+        <div id="combo"></div>
+      </div>
+
+      <section id="menu">
+        <div>
+          <div class="menu-who"><span class="avatar" data-avatar></span><div id="menu-best" class="menu-best"></div></div>
+          <h1 class="menu-title">How high<br />can you<br />stack?</h1>
+          <p class="menu-how">Tap to drop each block. Whatever hangs over gets cut off. <b>Land it perfectly to grow it back.</b></p>
+        </div>
+        <div class="menu-cta">Tap anywhere to start</div>
+      </section>
+
+      <section id="over">
+        <div class="over-top">
+          <div class="over-who">
+            <span class="avatar" data-avatar></span>
+            <div>
+              <div class="over-label">Blocks stacked</div>
+              <div id="over-score" class="over-score">0</div>
+            </div>
+          </div>
+          <div class="over-stats">
+            <div class="over-stat"><span id="new-best" class="new-best">New best</span>Best <b id="over-best">0</b></div>
+            <div class="over-stat">Perfect drops <b id="over-perfects">0</b></div>
+          </div>
+        </div>
+        <p id="over-line" class="over-line"></p>
+        <div class="over-actions">
+          <button id="btn-again" class="btn btn-primary">Play again</button>
+          <button id="btn-challenge" class="btn btn-ghost">Challenge</button>
+          <button id="btn-board" class="btn btn-ghost" hidden>Leaderboard</button>
+        </div>
+      </section>
+
+      <div id="toast"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

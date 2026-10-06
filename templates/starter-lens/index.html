@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Web Lens</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        /* Must match PlayCanvas camera clearColor to prevent white flash */
+        background-color: #0b0c10;
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+
+      canvas#app {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* HUD layer respecting safe area insets */
+      #hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-top: calc(var(--safe-top) + 16px);
+        padding-bottom: calc(var(--safe-bottom) + 16px);
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .hud-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: #ffffff;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+      }
+
+      .hud-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+
+      .hud-score {
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #00ffff;
+      }
+
+      .hud-footer {
+        text-align: center;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="app"></canvas>
+
+    <div id="hud">
+      <div class="hud-header">
+        <span class="hud-title">Web Lens</span>
+        <span id="score-display" class="hud-score">0</span>
+      </div>
+      <div class="hud-footer">
+        <span>Tap screen to interact</span>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

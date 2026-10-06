@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>ONLY 1% CAN PASS</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --ink: #080911; /* matches PlayCanvas clearColor */
+        --paper: #f3efe6;
+        --dim: rgba(243, 239, 230, 0.55);
+        --faint: rgba(243, 239, 230, 0.14);
+        --sig: #ffe14a;
+        --fail: #ff3b3b;
+        --display: 'Anton', Impact, 'Arial Narrow Bold', sans-serif;
+        --body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink);
+        font-family: var(--body);
+        color: var(--paper);
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 440px;
+        max-height: 920px;
+        overflow: hidden;
+        background: var(--ink);
+      }
+
+      @media (min-width: 520px) and (min-height: 600px) {
+        #game-container {
+          height: 94vh;
+          outline: 1px solid var(--faint);
+        }
+      }
+
+      canvas#app {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--dim);
+      }
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: calc(var(--safe-top) + 14px) 18px 28px;
+        pointer-events: none;
+        background: linear-gradient(var(--ink) 0%, rgba(8, 9, 17, 0.6) 55%, transparent);
+        opacity: 0;
+        transition: opacity 0.2s;
+        z-index: 10;
+      }
+
+      .is-playing #hud {
+        opacity: 1;
+      }
+
+      .hud-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+
+      .hud-level {
+        font-family: var(--display);
+        font-size: 34px;
+        line-height: 1;
+        letter-spacing: 0.01em;
+      }
+
+      .hud-level small {
+        font-size: 18px;
+        color: var(--dim);
+      }
+
+      .hud-score {
+        font-family: var(--display);
+        font-size: 34px;
+        line-height: 1;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: var(--sig);
+      }
+
+      .hud-sub {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 6px;
+      }
+
+      .level-progress-bar {
+        display: flex;
+        gap: 3px;
+        height: 4px;
+        margin-top: 10px;
+      }
+
+      .level-seg {
+        flex: 1;
+        background: var(--faint);
+      }
+
+      .level-seg.active {
+        background: var(--sig);
+      }
+
+      .level-seg:last-child.active {
+        background: var(--fail);
+      }
+
+      /* ---------- In-game callouts ---------- */
+      #clutch-toast {
+        position: absolute;
+        top: 21%;
+        left: 50%;
+        padding: 4px 12px 2px;
+        background: var(--sig);
+        color: var(--ink);
+        font-family: var(--display);
+        font-size: 26px;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+        transform: translate(-50%, -50%) rotate(-4deg) scale(0.4);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.18s cubic-bezier(0.2, 1.6, 0.4, 1), opacity 0.12s;
+        z-index: 15;
+      }
+
+      #clutch-toast.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(-4deg) scale(1);
+      }
+
+      #level-announcement {
+        position: absolute;
+        top: 36%;
+        left: -8%;
+        right: -8%;
+        padding: 14px 12% 12px;
+        background: var(--sig);
+        color: var(--ink);
+        text-align: center;
+        transform: translateY(-50%) rotate(-3deg) translateX(-110%);
+        pointer-events: none;
+        transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 20;
+      }
+
+      #level-announcement.show {
+        transform: translateY(-50%) rotate(-3deg) translateX(0);
+      }
+
+      #level-announcement.leave {
+        transform: translateY(-50%) rotate(-3deg) translateX(110%);
+      }
+
+      #level-announcement.final {
+        background: var(--fail);
+        color: var(--paper);
+      }
+
+      .level-ann-title {
+        font-family: var(--display);
+        font-size: 58px;
+        line-height: 0.95;
+      }
+
+      .level-ann-sub {
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        margin-top: 6px;
+      }
+
+      /* ---------- Screens ---------- */
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: calc(var(--safe-top) + 20px) 22px calc(var(--safe-bottom) + 22px);
+        background: rgba(8, 9, 17, 0.93);
+        z-index: 100;
+        transition: opacity 0.2s ease;
+      }
+
+      .screen.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .screen-top {
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .screen-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: clamp(14px, 3vh, 26px);
+        min-height: 0;
+      }
+
+      .hero-title {
+        font-family: var(--display);
+        font-weight: 400;
+        font-size: min(11vh, 26vw, 112px);
+        white-space: nowrap;
+        line-height: 0.9;
+        text-transform: uppercase;
+      }
+
+      .hero-title .hl {
+        display: inline-block;
+        background: var(--sig);
+        color: var(--ink);
+        padding: 0 0.08em;
+        margin-right: 0.06em;
+      }
+
+      .lede {
+        font-size: 15px;
+        line-height: 1.4;
+        color: var(--dim);
+        max-width: 30ch;
+      }
+
+      .lede b {
+        color: var(--paper);
+        font-weight: 600;
+      }
+
+      /* Pass-rate ladder (start + results) */
+      .ladder {
+        list-style: none;
+        border-top: 1px solid var(--faint);
+      }
+
+      .rung {
+        display: grid;
+        grid-template-columns: 22px 1fr 72px 38px;
+        align-items: center;
+        gap: 10px;
+        height: clamp(24px, 3.4vh, 30px);
+        border-bottom: 1px solid var(--faint);
+        font-family: var(--mono);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .rung-n {
+        color: var(--dim);
+      }
+
+      .rung-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .rung-bar {
+        height: 6px;
+        background: var(--faint);
+      }
+
+      .rung-bar i {
+        display: block;
+        height: 100%;
+        width: calc(var(--p) * 100%);
+        min-width: 2px;
+        background: var(--paper);
+      }
+
+      .rung-pct {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .rung.is-final .rung-name,
+      .rung.is-final .rung-pct {
+        color: var(--fail);
+      }
+
+      .rung.is-final .rung-bar i {
+        background: var(--fail);
+      }
+
+      /* Result states */
+      .rung.is-passed .rung-bar i {
+        background: var(--sig);
+      }
+
+      .rung.is-locked {
+        opacity: 0.35;
+      }
+
+      .rung.is-out {
+        background: var(--fail);
+        color: var(--ink);
+        margin: 0 -8px;
+        padding: 0 8px;
+      }
+
+      .rung.is-out .rung-n,
+      .rung.is-out .rung-name,
+      .rung.is-out .rung-pct {
+        color: var(--ink);
+      }
+
+      .rung.is-out .rung-bar {
+        background: rgba(8, 9, 17, 0.25);
+      }
+
+      .rung.is-out .rung-bar i {
+        background: var(--ink);
+      }
+
+      .rung.is-out.is-final {
+        background: var(--sig);
+      }
+
+      /* Buttons */
+      .btn {
+        display: block;
+        width: 100%;
+        height: 58px;
+        border: 0;
+        border-radius: 0;
+        font-family: var(--display);
+        font-size: 24px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: transform 0.08s, box-shadow 0.08s;
+      }
+
+      .btn-primary {
+        background: var(--sig);
+        color: var(--ink);
+        box-shadow: 5px 5px 0 var(--paper);
+      }
+
+      .btn-primary:active {
+        transform: translate(5px, 5px);
+        box-shadow: 0 0 0 var(--paper);
+      }
+
+      .btn-ghost {
+        background: transparent;
+        color: var(--paper);
+        box-shadow: inset 0 0 0 2px var(--paper);
+      }
+
+      .btn-ghost:active {
+        background: var(--paper);
+        color: var(--ink);
+      }
+
+      .btn-row {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 12px;
+      }
+
+      /* Bitmoji: square, hard-edged, like the rest of the UI. Hidden until it loads. */
+      .avatar {
+        display: none;
+        width: 44px;
+        height: 44px;
+        background: #1a1c26 center / cover no-repeat;
+        box-shadow: 3px 3px 0 var(--sig);
+        flex: none;
+      }
+
+      .has-avatar .avatar {
+        display: block;
+      }
+
+      .who {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .btn-board {
+        height: 44px;
+        font-size: 18px;
+        margin-top: 10px;
+      }
+
+      .btn-board[hidden] {
+        display: none;
+      }
+
+      .screen-foot {
+        padding-top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .screen-foot .meta {
+        text-align: center;
+      }
+
+      /* Results */
+      .verdict {
+        font-family: var(--display);
+        font-size: min(14vh, 30vw, 128px);
+        line-height: 0.88;
+        color: var(--fail);
+        text-transform: uppercase;
+      }
+
+      .verdict.win {
+        color: var(--sig);
+      }
+
+      .roast {
+        font-size: 16px;
+        line-height: 1.35;
+        font-weight: 600;
+        margin-top: 10px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--faint);
+        border-bottom: 1px solid var(--faint);
+      }
+
+      .stat {
+        padding: 10px 0 8px;
+      }
+
+      .stat + .stat {
+        padding-left: 12px;
+        border-left: 1px solid var(--faint);
+      }
+
+      .stat-val {
+        font-family: var(--display);
+        font-size: 30px;
+        line-height: 1.1;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .stat-val.sig {
+        color: var(--sig);
+      }
+
+      .new-best {
+        display: none;
+        margin-left: 6px;
+        padding: 1px 4px;
+        background: var(--sig);
+        color: var(--ink);
+      }
+
+      .new-best.show {
+        display: inline;
+      }
+
+      #toast-message {
+        position: absolute;
+        bottom: calc(var(--safe-bottom) + 96px);
+        left: 50%;
+        transform: translate(-50%, 12px);
+        padding: 10px 16px;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.2s, opacity 0.2s;
+        z-index: 200;
+      }
+
+      #toast-message.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #level-announcement,
+        #clutch-toast,
+        .screen,
+        #toast-message {
+          transition: opacity 0.15s;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container">
+      <canvas id="app"></canvas>
+
+      <!-- In-game HUD -->
+      <div id="hud">
+        <div class="hud-row">
+          <div class="hud-level">LV <span id="hud-level-num">01</span><small>/08</small></div>
+          <div id="hud-score" class="hud-score">0</div>
+        </div>
+        <div class="hud-sub">
+          <span id="hud-level-name" class="meta">The Warmup</span>
+          <span id="hud-pass-rate" class="meta">99% pass</span>
+        </div>
+        <div class="level-progress-bar" id="level-progress"></div>
+      </div>
+
+      <div id="clutch-toast">CLUTCH +50</div>
+
+      <div id="level-announcement">
+        <div id="ann-title" class="level-ann-title">LEVEL 1</div>
+        <div id="ann-sub" class="level-ann-sub">THE WARMUP — 99% MAKE IT</div>
+      </div>
+
+      <!-- Start screen -->
+      <section id="start-modal" class="screen">
+        <div class="screen-top">
+          <span class="who"><span class="avatar" data-avatar></span><span class="meta">Reflex test</span></span>
+          <span id="start-best" class="meta"></span>
+        </div>
+        <div class="screen-body">
+          <h1 class="hero-title">Only<br /><span class="hl">1%</span> can<br />pass</h1>
+          <p class="lede">Drag anywhere to steer. <b>Don't get hit.</b> It gets faster every 8 seconds.</p>
+          <ol id="start-ladder" class="ladder"></ol>
+        </div>
+        <div class="screen-foot">
+          <button id="btn-start" class="btn btn-primary">Start the test →</button>
+        </div>
+      </section>
+
+      <!-- Results screen -->
+      <section id="gameover-modal" class="screen hidden">
+        <div class="screen-top">
+          <span class="who"><span class="avatar" data-avatar></span><span id="go-meta" class="meta">Result</span></span>
+          <span id="go-percentile" class="meta"></span>
+        </div>
+        <div class="screen-body">
+          <div>
+            <h2 id="go-title" class="verdict">Failed</h2>
+            <p id="go-roast" class="roast"></p>
+          </div>
+          <ol id="go-ladder" class="ladder"></ol>
+          <div class="stats">
+            <div class="stat">
+              <div class="meta">Score</div>
+              <div id="go-score" class="stat-val sig">0</div>
+            </div>
+            <div class="stat">
+              <div class="meta">Best<span id="go-new-best" class="new-best">New</span></div>
+              <div id="go-best" class="stat-val">0</div>
+            </div>
+            <div class="stat">
+              <div class="meta">Level</div>
+              <div id="go-level" class="stat-val">1/8</div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-foot">
+          <div class="btn-row">
+            <button id="btn-restart" class="btn btn-primary">Retry</button>
+            <button id="btn-challenge" class="btn btn-ghost">Challenge</button>
+          </div>
+          <button id="btn-board" class="btn btn-ghost btn-board" hidden>Leaderboard</button>
+        </div>
+      </section>
+
+      <div id="toast-message"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

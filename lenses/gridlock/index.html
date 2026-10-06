@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <title>Gridlock</title>
+    <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --ink: #0a0f26; /* matches the PlayCanvas clear colour */
+        --ink-2: #131a3d;
+        --fg: #f6f3ea;
+        --fg-dim: rgba(246, 243, 234, 0.62);
+        --fg-faint: rgba(246, 243, 234, 0.12);
+        --gold: #ffd23f;
+        --card: #141b42;
+        --display: 'Unbounded Variable', 'Avenir Next', 'Helvetica Neue', sans-serif;
+        --body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: var(--ink);
+        color: var(--fg);
+        font-family: var(--body);
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #game-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 440px;
+        max-height: 920px;
+        overflow: hidden;
+        background: var(--ink);
+      }
+
+      @media (min-width: 520px) and (min-height: 600px) {
+        #game-container {
+          height: 94vh;
+          border-radius: 28px;
+          outline: 1px solid var(--fg-faint);
+        }
+      }
+
+      canvas#app {
+        position: absolute;
+        inset: 0;
+        display: block;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+        border: 0;
+        background: none;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: calc(var(--safe-top) + 14px) 18px 0;
+        pointer-events: none;
+        z-index: 10;
+        transition: opacity 0.25s;
+      }
+
+      .hud-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg-dim);
+      }
+
+      #hud-mode {
+        font-family: var(--display);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--fg);
+      }
+
+      #hud-score {
+        margin-top: 6px;
+        text-align: center;
+        font-family: var(--display);
+        font-size: 50px;
+        font-weight: 700;
+        line-height: 1;
+        letter-spacing: -0.03em;
+      }
+
+      #combo {
+        height: 26px;
+        margin-top: 8px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--display);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--gold);
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      #combo.show {
+        opacity: 1;
+      }
+
+      .pips {
+        display: flex;
+        gap: 3px;
+      }
+
+      .pips i {
+        width: 14px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--gold);
+      }
+
+      .pips i.off {
+        background: var(--fg-faint);
+      }
+
+      /* Praise word + points, centred over the board */
+      #praise {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 40%;
+        text-align: center;
+        pointer-events: none;
+        z-index: 15;
+        opacity: 0;
+        transform: scale(0.6);
+      }
+
+      #praise.show {
+        animation: praise 1.1s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+      }
+
+      @keyframes praise {
+        0% {
+          opacity: 0;
+          transform: scale(0.5);
+        }
+        18% {
+          opacity: 1;
+          transform: scale(1.06);
+        }
+        30% {
+          transform: scale(1);
+        }
+        75% {
+          opacity: 1;
+          transform: translateY(-6px);
+        }
+        100% {
+          opacity: 0;
+          transform: translateY(-22px);
+        }
+      }
+
+      #praise-word {
+        font-family: var(--display);
+        font-size: 40px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: var(--fg);
+        -webkit-text-stroke: 1.5px var(--ink);
+        paint-order: stroke fill;
+        text-shadow: 0 4px 0 var(--ink);
+      }
+
+      #praise-points {
+        margin-top: 4px;
+        font-family: var(--display);
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--gold);
+        text-shadow: 0 3px 0 var(--ink);
+      }
+
+      /* ---------- Screens ---------- */
+      .screen {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: calc(var(--safe-top) + 26px) 20px calc(var(--safe-bottom) + 22px);
+        z-index: 30;
+        transition: opacity 0.25s, visibility 0.25s;
+      }
+
+      .screen.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /* Menu */
+      #menu {
+        background: linear-gradient(180deg, transparent 0%, transparent 46%, rgba(10, 15, 38, 0.9) 60%, var(--ink) 72%);
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .title {
+        font-family: var(--display);
+        font-size: clamp(40px, 12.5vw, 54px);
+        font-weight: 800;
+        letter-spacing: -0.045em;
+        line-height: 1;
+      }
+
+      .tagline {
+        margin: 6px 0 14px;
+        font-size: 16px;
+        line-height: 1.4;
+        color: var(--fg-dim);
+      }
+
+      .mode-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-height: 76px;
+        padding: 14px 18px;
+        border-radius: 20px;
+        text-align: left;
+        transition: transform 0.1s;
+      }
+
+      .mode-btn:active {
+        transform: scale(0.97);
+      }
+
+      .mode-btn.primary {
+        background: var(--gold);
+        color: var(--ink);
+      }
+
+      .mode-btn.secondary {
+        background: var(--ink-2);
+        box-shadow: inset 0 0 0 1px var(--fg-faint);
+      }
+
+      .mode-name,
+      .mode-sub {
+        display: block;
+      }
+
+      .mode-name {
+        font-family: var(--display);
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .mode-sub {
+        margin-top: 3px;
+        font-size: 13.5px;
+        font-weight: 500;
+        opacity: 0.72;
+      }
+
+      .mode-side {
+        font-family: var(--display);
+        font-size: 15px;
+        font-weight: 700;
+        text-align: right;
+      }
+
+      .mode-side small {
+        display: block;
+        font-family: var(--body);
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0.65;
+      }
+
+      /* Results */
+      #over {
+        background: rgba(10, 15, 38, 0.86);
+        justify-content: center;
+      }
+
+      .card {
+        padding: 22px 20px 18px;
+        border-radius: 26px;
+        background: var(--card);
+        box-shadow: inset 0 0 0 1px var(--fg-faint);
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      #avatar {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: var(--ink-2);
+        object-fit: cover;
+        flex: none;
+      }
+
+      #avatar[hidden] {
+        display: none;
+      }
+
+      .card-mode {
+        font-family: var(--display);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .card-date {
+        font-size: 13px;
+        color: var(--fg-dim);
+        margin-top: 2px;
+      }
+
+      .card-body {
+        display: flex;
+        gap: 16px;
+        align-items: flex-end;
+        margin-top: 16px;
+      }
+
+      .card-score-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg-dim);
+      }
+
+      #over-score {
+        font-family: var(--display);
+        font-size: 46px;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        line-height: 1.05;
+      }
+
+      .new-best {
+        display: none;
+        margin-top: 6px;
+        padding: 3px 8px;
+        border-radius: 99px;
+        background: var(--gold);
+        color: var(--ink);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        width: max-content;
+      }
+
+      .new-best.show {
+        display: block;
+      }
+
+      #mini-board {
+        margin-left: auto;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 2px;
+        width: 112px;
+        flex: none;
+      }
+
+      #mini-board i {
+        aspect-ratio: 1;
+        border-radius: 2px;
+        background: var(--fg-faint);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px solid var(--fg-faint);
+      }
+
+      .stat-val {
+        font-family: var(--display);
+        font-size: 20px;
+        font-weight: 700;
+      }
+
+      .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg-dim);
+        margin-top: 2px;
+      }
+
+      .over-note {
+        margin: 14px 4px 0;
+        font-size: 14px;
+        line-height: 1.4;
+        color: var(--fg-dim);
+        text-align: center;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .btn {
+        height: 56px;
+        border-radius: 18px;
+        font-family: var(--display);
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        transition: transform 0.1s;
+      }
+
+      .btn:active {
+        transform: scale(0.96);
+      }
+
+      .btn-gold {
+        background: var(--gold);
+        color: var(--ink);
+      }
+
+      .btn-ghost {
+        background: var(--fg-faint);
+      }
+
+      .btn-wide {
+        grid-column: 1 / -1;
+        height: 48px;
+        background: none;
+        color: var(--fg-dim);
+        font-size: 13px;
+      }
+
+      #toast {
+        position: absolute;
+        top: calc(var(--safe-top) + 18px);
+        left: 50%;
+        padding: 10px 16px;
+        border-radius: 99px;
+        background: var(--fg);
+        color: var(--ink);
+        font-size: 14px;
+        font-weight: 700;
+        white-space: nowrap;
+        transform: translate(-50%, -10px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s, transform 0.2s;
+        z-index: 50;
+      }
+
+      #toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      .is-menu #hud {
+        opacity: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #praise.show {
+          animation-duration: 0.01s;
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-container" class="is-menu">
+      <canvas id="app"></canvas>
+
+      <div id="hud">
+        <div class="hud-row">
+          <span id="hud-mode">Daily #1</span>
+          <span>Best <b id="hud-best" class="num">0</b></span>
+        </div>
+        <div id="hud-score" class="num">0</div>
+        <div id="combo"><span id="combo-label">Combo ×2</span><span id="combo-pips" class="pips"></span></div>
+      </div>
+
+      <div id="praise">
+        <div id="praise-word">Great!</div>
+        <div id="praise-points" class="num">+240</div>
+      </div>
+
+      <section id="menu" class="screen">
+        <h1 class="title">Gridlock</h1>
+        <p class="tagline">Fill a row or column to clear it. Chain clears for combos. Don't get stuck.</p>
+        <button id="btn-daily" class="mode-btn primary">
+          <span>
+            <span id="daily-name" class="mode-name">Daily #1</span>
+            <span class="mode-sub">Same pieces for everyone today</span>
+          </span>
+          <span id="daily-side" class="mode-side"></span>
+        </button>
+        <button id="btn-endless" class="mode-btn secondary">
+          <span>
+            <span class="mode-name">Endless</span>
+            <span class="mode-sub">New pieces every game</span>
+          </span>
+          <span id="endless-side" class="mode-side"></span>
+        </button>
+      </section>
+
+      <section id="over" class="screen hidden">
+        <div class="card">
+          <div class="card-head">
+            <img id="avatar" alt="" hidden />
+            <div>
+              <div id="over-mode" class="card-mode">Daily #1</div>
+              <div id="over-date" class="card-date"></div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div>
+              <div class="card-score-label">Score</div>
+              <div id="over-score" class="num">0</div>
+              <div id="new-best" class="new-best">New best</div>
+            </div>
+            <div id="mini-board" aria-hidden="true"></div>
+          </div>
+          <div class="stats">
+            <div><div id="over-lines" class="stat-val num">0</div><div class="stat-label">Lines</div></div>
+            <div><div id="over-combo" class="stat-val num">0</div><div class="stat-label">Best combo</div></div>
+            <div><div id="over-pieces" class="stat-val num">0</div><div class="stat-label">Pieces</div></div>
+          </div>
+        </div>
+        <p id="over-note" class="over-note"></p>
+        <div class="actions">
+          <button id="btn-share" class="btn btn-gold">Challenge</button>
+          <button id="btn-again" class="btn btn-ghost">Play again</button>
+          <button id="btn-menu" class="btn btn-wide">Back to menu</button>
+        </div>
+      </section>
+
+      <div id="toast"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

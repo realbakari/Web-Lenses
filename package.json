@@ -1,0 +1,12 @@
+{
+  "name": "web-lenses-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Multi-lens workspace for Snapchat Web Lenses built with PlayCanvas and Vite",
+  "scripts": {
+    "new-lens": "node tools/create-lens.mjs",
+    "skills:list": "npx -y skills list",
+    "skills:update": "npx -y skills update"
+  }
+}
